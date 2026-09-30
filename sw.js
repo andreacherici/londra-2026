@@ -14,7 +14,7 @@
    telefono si accorge che c'e' una versione nuova e cambia le copie salvate. */
 'use strict';
 
-const VERSIONE = '20260930-151629';
+const VERSIONE = '20261001-000625';
 const CACHE_APP = 'londra-app-' + VERSIONE;   // pagine e icone: cambia a ogni pubblicazione
 const CACHE_TILE = 'londra-tile-v1';          // tasselli della mappa: resta tra una versione e l'altra
 const CACHE_FONT = 'londra-font-v1';          // font di Google
@@ -23,7 +23,7 @@ const PREFISSO = 'londra-';                   // tocchiamo solo le cache nostre 
 const PRECACHE = [
   './',
   'index.html',
-  'programma.html',
+  'programma.html',                            // solo un rinvio a ./#programma (il Programma sta dentro la mappa): serve alle vecchie schermate Home e ai vecchi link
   'manifest.webmanifest',
   'icone/icona-180.png',
   'icone/icona-192.png',
