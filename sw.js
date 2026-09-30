@@ -6,13 +6,15 @@
    - tasselli della mappa (tile): copia salvata per prima, la rete solo se manca. Si salvano solo risposte
      "CORS" normali: quelle "opache" pesano circa 7 MB l'una nella quota del telefono e non si salvano;
    - font di Google: si usa subito la copia salvata e intanto la si aggiorna;
+   - sincronizzazione (*.firebasedatabase.app) e ricerca luoghi (nominatim, photon): mai in cache, il service worker non
+     interviene (solo rete);
    - tutto e' in try/catch: se qualcosa va storto il service worker si fa da parte e la pagina funziona lo stesso.
 
    La riga VERSIONE qui sotto viene riscritta da pubblica.ps1 a ogni pubblicazione (data e ora): cosi' il
    telefono si accorge che c'e' una versione nuova e cambia le copie salvate. */
 'use strict';
 
-const VERSIONE = '20260929-213225';
+const VERSIONE = '20260930-132829';
 const CACHE_APP = 'londra-app-' + VERSIONE;   // pagine e icone: cambia a ogni pubblicazione
 const CACHE_TILE = 'londra-tile-v1';          // tasselli della mappa: resta tra una versione e l'altra
 const CACHE_FONT = 'londra-font-v1';          // font di Google
@@ -35,6 +37,10 @@ const ATTESA_RETE_MS = 4000;
 
 const HOST_TILE = ['tile.openstreetmap.org', 'server.arcgisonline.com', 'tile.openstreetmap.de'];
 const HOST_FONT = ['fonts.googleapis.com', 'fonts.gstatic.com'];
+// Servizi "vivi": sincronizzazione (Firebase) e ricerca luoghi. Le risposte non si salvano MAI (sarebbero dati vecchi o, nel caso
+// della sincronizzazione, dati condivisi cifrati in una cache che nessuno controlla) e il service worker non interviene proprio:
+// la richiesta va sempre in rete, e senza rete fallisce subito come deve (l'app lo sa gestire).
+const HOST_SOLO_RETE = ['firebasedatabase.app', 'nominatim.openstreetmap.org', 'photon.komoot.io'];
 
 let tileSalvati = 0;
 
@@ -76,6 +82,7 @@ try {
       if (richiesta.method !== 'GET') return;
       const url = new URL(richiesta.url);
       if (url.protocol !== 'https:' && url.protocol !== 'http:') return;
+      if (isHost(url.hostname, HOST_SOLO_RETE)) return;      // solo rete: nessun respondWith, nessuna cache
 
       if (url.origin === self.location.origin) {
         const accept = richiesta.headers.get('accept') || '';
