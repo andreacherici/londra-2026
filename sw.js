@@ -14,7 +14,7 @@
    telefono si accorge che c'e' una versione nuova e cambia le copie salvate. */
 'use strict';
 
-const VERSIONE = '20261003-101129';
+const VERSIONE = '20261003-113547';
 const CACHE_APP = 'londra-app-' + VERSIONE;   // pagine e icone: cambia a ogni pubblicazione
 const CACHE_TILE = 'londra-tile-v1';          // tasselli della mappa: resta tra una versione e l'altra
 const CACHE_FONT = 'londra-font-v1';          // font di Google
