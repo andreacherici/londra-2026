@@ -2,7 +2,8 @@
    Qui dentro NON ci sono dati del viaggio (quelli stanno nelle pagine cifrate) e nessuna password.
 
    Come lavora:
-   - pagine HTML: prima la rete (attesa massima 4 secondi), altrimenti la copia salvata sul telefono;
+   - pagine HTML: prima la rete, altrimenti la copia salvata sul telefono. Attesa massima: 1,5 secondi quando una copia c'e' gia'
+     (con rete debole l'app si apre subito, la versione nuova arriva alla prossima apertura), 4 secondi alla prima apertura;
    - tasselli della mappa (tile): copia salvata per prima, la rete solo se manca. Si salvano solo risposte
      "CORS" normali: quelle "opache" pesano circa 7 MB l'una nella quota del telefono e non si salvano;
    - font di Google: si usa subito la copia salvata e intanto la si aggiorna;
@@ -14,7 +15,7 @@
    telefono si accorge che c'e' una versione nuova e cambia le copie salvate. */
 'use strict';
 
-const VERSIONE = '20261006-103625';
+const VERSIONE = '20261011-001247';
 const CACHE_APP = 'londra-app-' + VERSIONE;   // pagine e icone: cambia a ogni pubblicazione
 const CACHE_TILE = 'londra-tile-v1';          // tasselli della mappa: resta tra una versione e l'altra
 const CACHE_FONT = 'londra-font-v1';          // font di Google
@@ -33,7 +34,8 @@ const PRECACHE = [
 
 const MAX_TILE = 2500;                        // oltre questo numero si eliminano i tasselli piu' vecchi
 const MAX_FONT = 40;
-const ATTESA_RETE_MS = 4000;
+const ATTESA_RETE_MS = 4000;                  // prima apertura (nessuna copia salvata): come sempre
+const ATTESA_RETE_CON_COPIA_MS = 1500;        // c'e' gia' una copia salvata: con rete debole si apre quella, la rete aggiorna in sottofondo
 
 const HOST_TILE = ['tile.openstreetmap.org', 'server.arcgisonline.com', 'tile.openstreetmap.de'];
 const HOST_FONT = ['fonts.googleapis.com', 'fonts.gstatic.com'];
@@ -139,7 +141,19 @@ function paginaAggiornata(richiesta) {
   return fetch(richiesta.url, { cache: 'no-cache', credentials: 'same-origin', redirect: 'manual' });
 }
 
-/* Pagine: rete per prima (max 4 s), poi copia salvata. Online la pagina si aggiorna da sola. */
+/* Cerca la copia salvata di una pagina (per l'indirizzo principale anche l'altra forma: ./ oppure index.html). */
+async function copiaPagina(cache, richiesta) {
+  let copia = await trova(cache, richiesta, true);
+  if (!copia) {
+    const url = new URL(richiesta.url);
+    if (/\/$|\/index\.html$/.test(url.pathname)) {
+      copia = await trova(cache, new Request(/\/$/.test(url.pathname) ? 'index.html' : './'), true);
+    }
+  }
+  return copia;
+}
+
+/* Pagine: rete per prima (max 1,5 s se c'e' gia' una copia salvata, 4 s se non c'e'), poi la copia. Online la pagina si aggiorna da sola. */
 async function retePrima(richiesta, event) {
   const cache = await caches.open(CACHE_APP);
 
@@ -153,21 +167,15 @@ async function retePrima(richiesta, event) {
   });
   rete.catch(() => {});   // evita l'errore "non gestito" se la rete cade dopo che abbiamo usato la copia
 
-  const scaduto = new Promise((risolvi) => setTimeout(() => risolvi(null), ATTESA_RETE_MS));
+  const copiaSalvata = await copiaPagina(cache, richiesta);      // con una copia in mano la rete debole non fa aspettare
+  const scaduto = new Promise((risolvi) => setTimeout(() => risolvi(null), copiaSalvata ? ATTESA_RETE_CON_COPIA_MS : ATTESA_RETE_MS));
 
   try {
     const risposta = await Promise.race([rete, scaduto]);
     if (risposta) return risposta;
   } catch (e) { /* rete non disponibile: si usa la copia */ }
 
-  let copia = await trova(cache, richiesta, true);
-  if (!copia) {
-    // pagina non salvata: per l'indirizzo principale si ripiega sull'altra forma (./ oppure index.html)
-    const url = new URL(richiesta.url);
-    if (/\/$|\/index\.html$/.test(url.pathname)) {
-      copia = await trova(cache, new Request(/\/$/.test(url.pathname) ? 'index.html' : './'), true);
-    }
-  }
+  const copia = copiaSalvata || await copiaPagina(cache, richiesta);      // (la rete, nel frattempo, potrebbe averne salvata una)
   if (copia) {
     estendi(event, rete);   // la rete lenta continua in sottofondo e aggiorna la copia
     return copia;
